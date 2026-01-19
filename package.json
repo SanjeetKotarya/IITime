@@ -1,8 +1,8 @@
 {
-  "name": "itime",
+  "name": "iitime",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://<your-username>.github.io/IITime",
+  "homepage": "https://SanjeetKotarya.github.io/IITime",
   "dependencies": {
     "lucide-react": "^0.562.0",
     "react": "^18.2.0",

@@ -387,12 +387,12 @@ const TimetableApp = () => {
               {isEditing ? (
                 <>
                   <Save size={16} className="hidden sm:inline" />
-                  Save Changes
+                  Save
                 </>
               ) : (
                 <>
                   <Edit2 size={16} className="hidden sm:inline" />
-                  Edit Timetable
+                  Edit
                 </>
               )}
             </button>

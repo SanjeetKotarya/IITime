@@ -349,7 +349,7 @@ const TimetableApp = () => {
         {/* Header */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-800">IITM-Time</h1>
+            <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-800">IITime</h1>
             <div className="flex items-center gap-2 bg-indigo-50 px-4 py-3 rounded-lg border-2 border-indigo-200">
               <div className="text-right">
                 <div className="text-lg sm:text-xl md:text-2xl font-bold text-indigo-600">{formatTime(currentTime)}</div>
@@ -417,10 +417,6 @@ const TimetableApp = () => {
 
         {/* Timetable */}
         <div className="bg-white rounded-lg shadow-lg p-6 overflow-x-auto">
-          <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-800 mb-4">
-            {currentTimetable.name}
-          </h2>
-
           <table className="w-full border-collapse">
             <thead>
               <tr>
@@ -438,7 +434,14 @@ const TimetableApp = () => {
                   <td className={`border-2 border-gray-300 p-2 sm:p-3 text-xs sm:text-sm font-semibold text-center w-32 whitespace-nowrap ${
                     slot.id === 'lunch' ? 'bg-orange-100' : 'bg-gray-50'
                   }`}>
-                    {slot.id === 'lunch' ? 'Lunch' : `${formatSlotTime(slot.start)} - ${formatSlotTime(slot.end)}`}
+                    {slot.id === 'lunch' ? (
+                      <div className="flex flex-col items-center">
+                        <div>Lunch</div>
+                        <div className="text-xs text-orange-600 mt-1">{formatSlotTime(slot.start)} - {formatSlotTime(slot.end)}</div>
+                      </div>
+                    ) : (
+                      `${formatSlotTime(slot.start)} - ${formatSlotTime(slot.end)}`
+                    )}
                   </td>
                   {currentTimetable.days.map((day) => {
                     const cell = currentTimetable.schedule[day][slotIdx];
@@ -460,9 +463,6 @@ const TimetableApp = () => {
                           <div className="text-center">
                             <div className="font-semibold text-xs sm:text-sm text-orange-700">
                               🍽️ Lunch Break
-                            </div>
-                            <div className="text-xs text-orange-600 mt-1">
-                              {formatSlotTime(slot.start)} - {formatSlotTime(slot.end)}
                             </div>
                           </div>
                         ) : isEditing ? (

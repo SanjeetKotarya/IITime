@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Edit2, Save } from 'lucide-react';
+import { Edit2, Save, Settings, X } from 'lucide-react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from './firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
@@ -13,6 +13,9 @@ const TimetableApp = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [tempSelectedYear, setTempSelectedYear] = useState('mtech');
+  const [programLoaded, setProgramLoaded] = useState(false);
 
   // Update current time every minute
   useEffect(() => {
@@ -24,17 +27,23 @@ const TimetableApp = () => {
   }, []);
 
   // Firestore functions
-  const saveToFirestore = async (data) => {
+  const saveToFirestore = async (data, programYear = null) => {
     if (!currentUser) return;
     
     try {
       setSaving(true);
       const userDocRef = doc(db, 'users', currentUser.uid);
-      await setDoc(userDocRef, {
+      const updateData = {
         username: currentUser.email?.split('@')[0],
         timetables: data,
         lastUpdated: new Date()
-      }, { merge: true });
+      };
+      
+      if (programYear) {
+        updateData.selectedProgram = programYear;
+      }
+      
+      await setDoc(userDocRef, updateData, { merge: true });
     } catch (err) {
       console.error('Error saving to Firestore:', err);
     } finally {
@@ -49,11 +58,19 @@ const TimetableApp = () => {
       const userDocRef = doc(db, 'users', user.uid);
       const userDoc = await getDoc(userDocRef);
       
-      if (userDoc.exists() && userDoc.data().timetables) {
-        setTimetables(userDoc.data().timetables);
+      if (userDoc.exists()) {
+        if (userDoc.data().timetables) {
+          setTimetables(userDoc.data().timetables);
+        }
+        if (userDoc.data().selectedProgram) {
+          setSelectedYear(userDoc.data().selectedProgram);
+          setTempSelectedYear(userDoc.data().selectedProgram);
+        }
       }
+      setProgramLoaded(true);
     } catch (err) {
       console.error('Error loading from Firestore:', err);
+      setProgramLoaded(true);
     }
   };
 
@@ -66,6 +83,7 @@ const TimetableApp = () => {
       } else {
         setCurrentUser(null);
         setTimetables({});
+        setProgramLoaded(true);
       }
       setAuthLoading(false);
     });
@@ -345,6 +363,19 @@ const TimetableApp = () => {
     setIsEditing(!isEditing);
   };
 
+  const handleOpenSettings = () => {
+    setTempSelectedYear(selectedYear);
+    setShowSettingsModal(true);
+  };
+
+  const handleApplyProgram = async () => {
+    setSelectedYear(tempSelectedYear);
+    setShowSettingsModal(false);
+    setIsEditing(false);
+    // Save the selected program to Firestore
+    await saveToFirestore(timetables, tempSelectedYear);
+  };
+
   const formatTime = (date) => {
     return date.toLocaleTimeString('en-US', { 
       hour: '2-digit', 
@@ -402,7 +433,7 @@ const TimetableApp = () => {
     return null;
   };
 
-  if (authLoading) {
+  if (authLoading || !programLoaded) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
@@ -421,38 +452,86 @@ const TimetableApp = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      {/* Settings Modal */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-gray-800">Select Your Program</h2>
+              <button
+                onClick={() => setShowSettingsModal(false)}
+                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X size={24} className="text-gray-600" />
+              </button>
+            </div>
+            
+            <div className="space-y-3 mb-6">
+              {[
+                { key: 'mtech', label: 'M.Tech / M.Sc / M.S / Ph.D' },
+                { key: 'btech', label: 'B.Tech / Dual Degree (Other than 1st year) & M.A' },
+                { key: 'firstyear', label: '1st B.Tech / Dual Degree' }
+              ].map((program) => (
+                <label key={program.key} className="flex items-center p-3 border-2 border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                  <input
+                    type="radio"
+                    name="program"
+                    value={program.key}
+                    checked={tempSelectedYear === program.key}
+                    onChange={(e) => setTempSelectedYear(e.target.value)}
+                    className="w-4 h-4 text-indigo-600 cursor-pointer"
+                  />
+                  <span className="ml-3 text-gray-700 font-medium">{program.label}</span>
+                </label>
+              ))}
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowSettingsModal(false)}
+                className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleApplyProgram}
+                className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors"
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto">
         <AuthComponent currentUser={currentUser} onAuthSuccess={() => window.location.reload()} />
         {/* Header */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-800">IITime</h1>
-            <div className="flex items-center gap-2 bg-indigo-50 px-4 py-3 rounded-lg border-2 border-indigo-200">
-              <div className="text-right">
-                <div className="text-lg sm:text-xl md:text-2xl font-bold text-indigo-600">{formatTime(currentTime)}</div>
-                <div className="text-xs sm:text-sm text-gray-600">{formatDate(currentTime)}</div>
+            <div>
+              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-800">IITime</h1>
+              <p className="text-sm text-gray-600 mt-1">Program: {currentTimetable?.name}</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 bg-indigo-50 px-4 py-3 rounded-lg border-2 border-indigo-200">
+                <div className="text-right">
+                  <div className="text-lg sm:text-xl md:text-2xl font-bold text-indigo-600">{formatTime(currentTime)}</div>
+                  <div className="text-xs sm:text-sm text-gray-600">{formatDate(currentTime)}</div>
+                </div>
               </div>
+              <button
+                onClick={handleOpenSettings}
+                className="p-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                title="Program Settings"
+              >
+                <Settings size={24} className="text-gray-700" />
+              </button>
             </div>
           </div>
           
           <div className="flex flex-col gap-2">
-            <label className="block text-xs sm:text-sm font-medium text-gray-700">
-              Select Year/Program
-            </label>
             <div className="flex flex-row gap-2 sm:gap-4 items-center">
-              <select
-                value={selectedYear}
-                onChange={(e) => {
-                  setSelectedYear(e.target.value);
-                  setIsEditing(false);
-                }}
-                className="flex-1 px-2 sm:px-4 py-1 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              >
-                <option value="mtech">M.Tech / M.Sc / M.S / Ph.D</option>
-                <option value="btech">B.Tech / Dual Degree (Other than 1st year) & M.A</option>
-                <option value="firstyear">1st B.Tech / Dual Degree</option>
-              </select>
-
               <button
                 onClick={toggleEdit}
                 className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-6 py-1 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${

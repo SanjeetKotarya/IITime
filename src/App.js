@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Edit2, Save } from 'lucide-react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from './firebase';
+import AuthComponent from './AuthComponent';
 
 const TimetableApp = () => {
   const [selectedYear, setSelectedYear] = useState('mtech');
   const [isEditing, setIsEditing] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [timetables, setTimetables] = useState({});
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
   // Update current time every minute
   useEffect(() => {
@@ -14,6 +19,20 @@ const TimetableApp = () => {
     }, 60000); // Update every minute
 
     return () => clearInterval(timer);
+  }, []);
+
+  // Check authentication state
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setCurrentUser(user);
+      } else {
+        setCurrentUser(null);
+      }
+      setAuthLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   // Initialize timetables structure
@@ -341,11 +360,27 @@ const TimetableApp = () => {
     return null;
   };
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-2xl font-bold text-gray-800 mb-4">IITime</div>
+          <div className="text-gray-600">Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return <AuthComponent onAuthSuccess={() => setCurrentUser(auth.currentUser)} currentUser={currentUser} />;
+  }
+
   if (!currentTimetable) return <div>Loading...</div>;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-7xl mx-auto">
+        <AuthComponent currentUser={currentUser} onAuthSuccess={() => window.location.reload()} />
         {/* Header */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <div className="flex items-center justify-between mb-4">

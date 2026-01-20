@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Edit2, Save } from 'lucide-react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from './firebase';
+import { auth, db } from './firebase';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import AuthComponent from './AuthComponent';
 
 const TimetableApp = () => {
@@ -11,6 +12,7 @@ const TimetableApp = () => {
   const [timetables, setTimetables] = useState({});
   const [currentUser, setCurrentUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   // Update current time every minute
   useEffect(() => {
@@ -21,13 +23,49 @@ const TimetableApp = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Check authentication state
+  // Firestore functions
+  const saveToFirestore = async (data) => {
+    if (!currentUser) return;
+    
+    try {
+      setSaving(true);
+      const userDocRef = doc(db, 'users', currentUser.uid);
+      await setDoc(userDocRef, {
+        username: currentUser.email?.split('@')[0],
+        timetables: data,
+        lastUpdated: new Date()
+      }, { merge: true });
+    } catch (err) {
+      console.error('Error saving to Firestore:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const loadFromFirestore = async (user) => {
+    if (!user) return;
+    
+    try {
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userDocRef);
+      
+      if (userDoc.exists() && userDoc.data().timetables) {
+        setTimetables(userDoc.data().timetables);
+      }
+    } catch (err) {
+      console.error('Error loading from Firestore:', err);
+    }
+  };
+
+  // Check authentication state and load timetables
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         setCurrentUser(user);
+        loadFromFirestore(user);
       } else {
         setCurrentUser(null);
+        setTimetables({});
       }
       setAuthLoading(false);
     });
@@ -285,18 +323,22 @@ const TimetableApp = () => {
   };
 
   const handleCellEdit = (day, slotIndex, field, value) => {
-    setTimetables(prev => ({
-      ...prev,
+    const updatedTimetables = {
+      ...timetables,
       [selectedYear]: {
-        ...prev[selectedYear],
+        ...timetables[selectedYear],
         schedule: {
-          ...prev[selectedYear].schedule,
-          [day]: prev[selectedYear].schedule[day].map((item, idx) =>
+          ...timetables[selectedYear].schedule,
+          [day]: timetables[selectedYear].schedule[day].map((item, idx) =>
             idx === slotIndex ? { ...item, [field]: value } : item
           )
         }
       }
-    }));
+    };
+    
+    setTimetables(updatedTimetables);
+    // Auto-save to Firestore
+    saveToFirestore(updatedTimetables);
   };
 
   const toggleEdit = () => {
@@ -431,6 +473,12 @@ const TimetableApp = () => {
                 </>
               )}
             </button>
+
+              {saving && (
+                <span className="text-xs sm:text-sm text-gray-600 font-medium">
+                  💾 Saving...
+                </span>
+              )}
             </div>
           </div>
         </div>
